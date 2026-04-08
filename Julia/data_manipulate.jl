@@ -56,8 +56,35 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         mean_records = round(mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
         var_records = round(var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
         sd_records = round(std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        mean_diff = round(mean.(c(`diff_2020`, `diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3),
-        var_diff = round(var.(c(`diff_2020`, `diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3),
-        sd_diff = round(std.(c(`diff_2020`, `diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3)
+        mean_diff = round(mean.(c(`diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3),
+        var_diff = round(var.(c(`diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3),
+        sd_diff = round(std.(c(`diff_2021`, `diff_2022`, `diff_2023`, `diff_2024`, `diff_2025`)), digits = 3),
+        z_diff_2021 = diff_2021 / sd_diff
     )
 end
+
+# Before additional data manipulation and modeling, plot differences
+diff_long =
+@chain trauma_registry_counts_2020_2025_final begin
+    @select(facility, diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)
+    @pivot_longer(
+        diff_2021:diff_2025,
+        names_to = :year,
+        values_to = :diff
+    )
+    @mutate(year = replace.(year, "diff_" => ""))
+end
+
+# Plots
+p_box =
+    ggplot(diff_long) +
+    geom_boxplot(aes(x = :facility, y = :diff)) +
+    facet_wrap(:facility; ncol = 4) +
+    labs(
+        x = "Facility",
+        y = "Differences",
+        title = "Distribution of Year‑to‑Year Differences by Facility"
+    ) +
+    theme_ggplot2()
+
+draw_ggplot(p_box)

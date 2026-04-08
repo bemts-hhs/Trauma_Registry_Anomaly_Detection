@@ -1,0 +1,5 @@
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DotEnv = "4dc1fcf4-5e3b-5448-94ab-0c38ec0385c1"
+Tidier = "f0413319-3358-4bb0-8e7c-0c83523a93bd"

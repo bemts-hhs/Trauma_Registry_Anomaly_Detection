@@ -1,0 +1,206 @@
+---
+title: "Iowa Trauma Registry Anomaly Detection Report"
+subtitle: "Annual Case Reporting Variability and Outlier Detection, 2020–2025"
+author: "Iowa Department of Health and Human Services"
+format:
+  pdf:
+    papersize: letter
+    geometry: margin=1in
+    fontsize: 12pt
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    colorlinks: true
+    linkcolor: blue
+    mainfont: "Work Sans"
+    monofont: "Arial"
+jupyter: julia-1.10
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: false
+---
+
+<!-- Setup -->
+```{julia setup, include=FALSE}
+
+#| label: setup
+
+using Pkg
+
+# Ensure required packages are available
+Pkg.activate(".")
+Pkg.instantiate()
+Pkg.add(["Tidier", "TidierPlots", "DotEnv", "CSV", "DataFrames"])
+
+# Load packages
+using Tidier
+using TidierPlots
+using DotEnv
+using CSV
+using DataFrames
+
+# Create .env file if it does not exist
+if !isfile(".env")
+    write(".env", """
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2020=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2021=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2022=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2023=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2024=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2025=
+IOWA_TRAUMA_REGISTRY_COUNT_PATH_2026=
+""")
+end
+
+# Load .env file into ENV[]
+DotEnv.load!()
+
+# Assign environment variables (no paths yet)
+iowa_trauma_registry_counts_path_2020 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2020"]
+iowa_trauma_registry_counts_path_2021 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2021"]
+iowa_trauma_registry_counts_path_2022 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2022"]
+iowa_trauma_registry_counts_path_2023 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2023"]
+iowa_trauma_registry_counts_path_2024 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2024"]
+iowa_trauma_registry_counts_path_2025 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2025"]
+iowa_trauma_registry_counts_path_2026 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2026"]
+```
+
+<!-- Load data -->
+```{julia data_load, include=FALSE}
+
+#| label: data_load
+
+# Simple validation for missing paths
+required_paths = [
+    ("2020", iowa_trauma_registry_counts_path_2020),
+    ("2021", iowa_trauma_registry_counts_path_2021),
+    ("2022", iowa_trauma_registry_counts_path_2022),
+    ("2023", iowa_trauma_registry_counts_path_2023),
+    ("2024", iowa_trauma_registry_counts_path_2024),
+    ("2025", iowa_trauma_registry_counts_path_2025),
+    ("2026", iowa_trauma_registry_counts_path_2026)
+]
+
+for (yr, p) in required_paths
+    if isempty(p)
+        @warn "Path for $yr is empty. Update .env before attempting to load data."
+    end
+end
+
+# Load all project data for anomaly detection via environment variable paths
+ trauma_registry_counts_2020 = CSV.read(iowa_trauma_registry_counts_path_2020, DataFrame)
+ trauma_registry_counts_2021 = CSV.read(iowa_trauma_registry_counts_path_2021, DataFrame)
+ trauma_registry_counts_2022 = CSV.read(iowa_trauma_registry_counts_path_2022, DataFrame)
+ trauma_registry_counts_2023 = CSV.read(iowa_trauma_registry_counts_path_2023, DataFrame)
+ trauma_registry_counts_2024 = CSV.read(iowa_trauma_registry_counts_path_2024, DataFrame)
+ trauma_registry_counts_2025 = CSV.read(iowa_trauma_registry_counts_path_2025, DataFrame)
+ 
+```
+
+```{julia data_manipulation, include=FALSE}
+
+#| label: data_manipulation
+
+# union all rows from files and select the needed variables
+trauma_registry_counts_2020_2025 = @chain trauma_registry_counts_2020 begin
+    @bind_rows(
+    trauma_registry_counts_2021, 
+    trauma_registry_counts_2022, 
+    trauma_registry_counts_2023, 
+    trauma_registry_counts_2024, 
+    trauma_registry_counts_2025
+    )
+    @select(year, facility, total)
+end
+
+# pivot columns wider
+trauma_registry_counts_2020_2025_pivot = @chain trauma_registry_counts_2020_2025 begin 
+    @pivot_wider(
+        names_from = year, 
+        values_from = total
+    )
+    @mutate(
+        across(`2020`:`2025`, x -> coalesce.(x, 0))
+    )
+    @mutate(
+        total_2020_2025 = `2020_function` + `2021_function` + `2022_function` + `2023_function` + `2024_function` + `2025_function`
+    )
+    @select(facility, `2020_function`:`2025_function`, total_2020_2025)
+    @rename(
+        `2020` = `2020_function`,
+        `2021` = `2021_function`,
+        `2022` = `2022_function`,
+        `2023` = `2023_function`,
+        `2024` = `2024_function`,
+        `2025` = `2025_function`
+    )
+end
+
+# finalize data by adding in differences between years 
+trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025_pivot begin
+    @mutate(
+        facility = replace.(facility, "\x96" => "–"),  # en dash,
+        diff_2021 = `2021` - `2020`,
+        diff_2022 = `2022` - `2021`,
+        diff_2023 = `2023` - `2022`,
+        diff_2024 = `2024` - `2023`,
+        diff_2025 = `2025` - `2024`,
+    )
+    @mutate(
+        mean_records = round(mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
+        var_records = round(var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
+        sd_records = round(std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
+        mean_diff = round(mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
+        var_diff = round(var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
+        sd_diff = round(std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3)
+    )
+    @mutate(
+        z_score_diff_2021 = div(diff_2021, sd_diff),
+        z_score_diff_2022 = div(diff_2022, sd_diff),
+        z_score_diff_2023 = div(diff_2023, sd_diff),
+        z_score_diff_2024 = div(diff_2024, sd_diff),
+        z_score_diff_2025 = div(diff_2025, sd_diff)
+    )
+    @mutate(
+        anomaly_2021 = abs(z_score_diff_2021) > 1,
+        anomaly_2022 = abs(z_score_diff_2022) > 1,
+        anomaly_2023 = abs(z_score_diff_2023) > 1,
+        anomaly_2024 = abs(z_score_diff_2024) > 1,
+        anomaly_2025 = abs(z_score_diff_2025) > 1
+    )
+    @mutate(
+        any_anomaly = any(c(
+            anomaly_2021,
+            anomaly_2022,
+            anomaly_2023,
+            anomaly_2024,
+            anomaly_2025
+        ))
+    )
+end
+
+# Before additional data manipulation and modeling, plot differences
+diff_long =
+@chain trauma_registry_counts_2020_2025_final begin
+    @select(facility, diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)
+    @pivot_longer(
+        diff_2021:diff_2025,
+        names_to = :year,
+        values_to = :diff
+    )
+    @mutate(
+        year = replace.(year, "diff_" => ""),
+        sign = ifelse(diff .< 0, "negative", "positive")
+    )
+end
+
+```
+
+# Introduction
+Accurate and complete reporting to the Iowa Trauma Registry is essential for statewide injury surveillance, system evaluation, and trauma program performance improvement. Annual case counts submitted by each facility support a wide range of analytic and operational needs, including burden estimation, regional resource planning, and assessment of trauma care access. Substantial year‑to‑year variation in reporting can indicate changes in patient volume, modifications in facility workflows, electronic health record transitions, or potential data quality issues.
+
+This report examines annual reporting differences from 2020 through 2025 for all participating Iowa trauma facilities. The analysis applies multiple anomaly‑detection methods to identify facilities with reporting patterns that deviate from expected values. These methods include standardized difference scores, robust dispersion measures, and model‑based trend residuals. Facilities with large positive or negative deviations are flagged for further review to support quality assurance activities.
+
+The objective is not to infer causation but to support registry data validation, highlight facilities requiring follow‑up, and strengthen the integrity of statewide trauma surveillance.

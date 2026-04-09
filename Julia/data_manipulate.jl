@@ -48,20 +48,36 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         diff_2025 = `2025` - `2024`,
     )
     @mutate(
-        mean_records = round(mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        var_records = round(var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        sd_records = round(std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        mean_diff = round(mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
-        var_diff = round(var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
-        sd_diff = round(std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3)
+        mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025))
     )
     @mutate(
-        z_score_diff_2021 = div(diff_2021, sd_diff),
-        z_score_diff_2022 = div(diff_2022, sd_diff),
-        z_score_diff_2023 = div(diff_2023, sd_diff),
-        z_score_diff_2024 = div(diff_2024, sd_diff),
-        z_score_diff_2025 = div(diff_2025, sd_diff)
+        z_score_diff_2021 = (diff_2021 - mean_diff) / sd_diff,
+        z_score_diff_2022 = (diff_2022 - mean_diff) / sd_diff,
+        z_score_diff_2023 = (diff_2023 - mean_diff) / sd_diff,
+        z_score_diff_2024 = (diff_2024 - mean_diff) / sd_diff,
+        z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff
     )
+    @mutate(
+        anomaly_2021 = abs(z_score_diff_2021) >= 1.5,
+        anomaly_2022 = abs(z_score_diff_2022) >= 1.5,
+        anomaly_2023 = abs(z_score_diff_2023) >= 1.5,
+        anomaly_2024 = abs(z_score_diff_2024) >= 1.5,
+        anomaly_2025 = abs(z_score_diff_2025) >= 1.5
+    )
+    @mutate(
+        any_anomaly = any(c(
+            anomaly_2021,
+            anomaly_2022,
+            anomaly_2023,
+            anomaly_2024,
+            anomaly_2025
+    ))
+)
 end
 
 # Before additional data manipulation and modeling, plot differences

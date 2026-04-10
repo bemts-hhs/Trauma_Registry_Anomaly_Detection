@@ -8,10 +8,12 @@ using Pkg
 # Ensure required packages are available
 Pkg.activate(".")
 Pkg.instantiate()
-Pkg.add(["Tidier", "TidierPlots", "DotEnv", "CSV", "DataFrames"])
+Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "DataFrames"])
 
 # Load packages
 using Tidier
+using TidierDates
+using Dates
 using TidierPlots
 using DotEnv
 using CSV

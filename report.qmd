@@ -2,6 +2,8 @@
 title: "Iowa Trauma Registry Anomaly Detection Report"
 subtitle: "Annual Case Reporting Variability and Outlier Detection, 2020–2025"
 author: "Iowa Department of Health and Human Services"
+params:
+  year: "2025"
 format:
   pdf:
     papersize: letter
@@ -14,7 +16,6 @@ format:
     linkcolor: blue
     mainfont: "Work Sans"
     monofont: "Arial"
-jupyter: julia-1.10
 execute:
   echo: true
   warning: false
@@ -27,19 +28,28 @@ execute:
 
 #| label: setup
 
+# prepare to load packages
 using Pkg
 
-# Ensure required packages are available
+#= 
+Ensure required packages are available
 Pkg.activate(".")
 Pkg.instantiate()
-Pkg.add(["Tidier", "TidierPlots", "DotEnv", "CSV", "DataFrames"])
+
+only need to install packages the first time
+Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "DataFrames", "Quarto"])
+ =#
 
 # Load packages
+# Load packages
 using Tidier
+using TidierDates
+using Dates
 using TidierPlots
 using DotEnv
 using CSV
 using DataFrames
+using Quarto
 
 # Create .env file if it does not exist
 if !isfile(".env")
@@ -201,6 +211,23 @@ end
 # Introduction
 Accurate and complete reporting to the Iowa Trauma Registry is essential for statewide injury surveillance, system evaluation, and trauma program performance improvement. Annual case counts submitted by each facility support a wide range of analytic and operational needs, including burden estimation, regional resource planning, and assessment of trauma care access. Substantial year‑to‑year variation in reporting can indicate changes in patient volume, modifications in facility workflows, electronic health record transitions, or potential data quality issues.
 
-This report examines annual reporting differences from 2020 through 2025 for all participating Iowa trauma facilities. The analysis applies multiple anomaly‑detection methods to identify facilities with reporting patterns that deviate from expected values. These methods include standardized difference scores, robust dispersion measures, and model‑based trend residuals. Facilities with large positive or negative deviations are flagged for further review to support quality assurance activities.
+This report examines annual reporting differences from 2020 through 2025 for all participating Iowa trauma facilities. The analysis applies an anomaly‑detection method focused on  to identify facilities with reporting patterns that deviate from expected values. These methods include standardized difference scores, robust dispersion measures, and model‑based trend residuals. Facilities with large positive or negative deviations are flagged for further review to support quality assurance activities.
 
 The objective is not to infer causation but to support registry data validation, highlight facilities requiring follow‑up, and strengthen the integrity of statewide trauma surveillance.
+
+# Test table of 2025 results
+```{julia test_table, echo=TRUE}
+
+# subset the table with columns we want to see and fit
+quarto_table = @chain trauma_registry_counts_2020_2025_final begin
+    @select :facility, :mean_records, :sd_records, :mean_diff, :sd_diff, contains("2025")
+end
+
+PrettyTables.pretty_table(
+    quarto_table,
+    column_labels=names(quarto_table),
+    show_row_number_column=false,
+    title="Facilities with Anomalous "
+)
+
+```

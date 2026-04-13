@@ -1,4 +1,4 @@
-``###_____________________________________________________________________________
+``####| _____________________________________________________________________________
 # Setup for the anomaly detection project to leverage Tidier and DotEnv
 # Setup for the environment variables to be used to secure filepaths
 ###_____________________________________________________________________________
@@ -8,7 +8,9 @@ using Pkg
 # Ensure required packages are available
 Pkg.activate(".")
 Pkg.instantiate()
-Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "DataFrames"])
+
+# only need to install packages the first time
+# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "DataFrames", "Quarto"])
 
 # Load packages
 using Tidier
@@ -18,6 +20,8 @@ using TidierPlots
 using DotEnv
 using CSV
 using DataFrames
+using Quarto
+using PrettyTables
 
 # Create .env file if it does not exist
 if !isfile(".env")

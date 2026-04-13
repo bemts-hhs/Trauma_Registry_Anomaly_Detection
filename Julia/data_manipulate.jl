@@ -37,6 +37,12 @@ trauma_registry_counts_2020_2025_pivot = @chain trauma_registry_counts_2020_2025
     )
 end
 
+# subset the table with columns we want to see and fit
+quarto_table = @chain trauma_registry_counts_2020_2025_final begin
+    @select :facility, :mean_records, :sd_records, :mean_diff, :sd_diff, contains("2025")
+    #@filter pct_anomaly_2025 == true
+end
+
 # finalize data by adding in differences between years 
 trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025_pivot begin
     @mutate(

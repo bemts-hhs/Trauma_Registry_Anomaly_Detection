@@ -4,8 +4,9 @@ subtitle: "Annual Case Reporting Variability and Outlier Detection, 2020–2025"
 author: "Iowa Department of Health and Human Services"
 params:
   year: "2025"
-format:
+format: 
   pdf:
+    pdf-engine: lualatex
     papersize: letter
     geometry: margin=1in
     fontsize: 12pt
@@ -16,17 +17,21 @@ format:
     linkcolor: blue
     mainfont: "Work Sans"
     monofont: "Arial"
+engine: julia
 execute:
-  echo: true
+  echo: false
+  eval: true
   warning: false
   message: false
   error: false
 ---
 
-<!-- Setup -->
-```{julia setup, include=FALSE}
+```{julia}
 
 #| label: setup
+#| echo: false
+#| include: false
+#| output: false
 
 # prepare to load packages
 using Pkg
@@ -36,11 +41,10 @@ Ensure required packages are available
 Pkg.activate(".")
 Pkg.instantiate()
 
-only need to install packages the first time
-Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "DataFrames", "Quarto"])
+# only need to install packages the first time
+# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "XLSX", "DataFrames", "Quarto"])
  =#
 
-# Load packages
 # Load packages
 using Tidier
 using TidierDates
@@ -48,8 +52,11 @@ using Dates
 using TidierPlots
 using DotEnv
 using CSV
+using XLSX
 using DataFrames
 using Quarto
+using PrettyTables
+
 
 # Create .env file if it does not exist
 if !isfile(".env")
@@ -62,25 +69,27 @@ IOWA_TRAUMA_REGISTRY_COUNT_PATH_2024=
 IOWA_TRAUMA_REGISTRY_COUNT_PATH_2025=
 IOWA_TRAUMA_REGISTRY_COUNT_PATH_2026=
 """)
-end
+end;
 
 # Load .env file into ENV[]
-DotEnv.load!()
+DotEnv.load!();
 
 # Assign environment variables (no paths yet)
-iowa_trauma_registry_counts_path_2020 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2020"]
-iowa_trauma_registry_counts_path_2021 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2021"]
-iowa_trauma_registry_counts_path_2022 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2022"]
-iowa_trauma_registry_counts_path_2023 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2023"]
-iowa_trauma_registry_counts_path_2024 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2024"]
-iowa_trauma_registry_counts_path_2025 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2025"]
-iowa_trauma_registry_counts_path_2026 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2026"]
+iowa_trauma_registry_counts_path_2020 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2020"];
+iowa_trauma_registry_counts_path_2021 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2021"];
+iowa_trauma_registry_counts_path_2022 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2022"];
+iowa_trauma_registry_counts_path_2023 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2023"];
+iowa_trauma_registry_counts_path_2024 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2024"];
+iowa_trauma_registry_counts_path_2025 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2025"];
+iowa_trauma_registry_counts_path_2026 = ENV["IOWA_TRAUMA_REGISTRY_COUNTS_PATH_2026"];
 ```
 
-<!-- Load data -->
-```{julia data_load, include=FALSE}
+```{julia}
 
 #| label: data_load
+#| echo: false
+#| include: false
+#| output: false
 
 # Simple validation for missing paths
 required_paths = [
@@ -91,27 +100,29 @@ required_paths = [
     ("2024", iowa_trauma_registry_counts_path_2024),
     ("2025", iowa_trauma_registry_counts_path_2025),
     ("2026", iowa_trauma_registry_counts_path_2026)
-]
+];
 
 for (yr, p) in required_paths
     if isempty(p)
         @warn "Path for $yr is empty. Update .env before attempting to load data."
     end
-end
+end;
 
 # Load all project data for anomaly detection via environment variable paths
- trauma_registry_counts_2020 = CSV.read(iowa_trauma_registry_counts_path_2020, DataFrame)
- trauma_registry_counts_2021 = CSV.read(iowa_trauma_registry_counts_path_2021, DataFrame)
- trauma_registry_counts_2022 = CSV.read(iowa_trauma_registry_counts_path_2022, DataFrame)
- trauma_registry_counts_2023 = CSV.read(iowa_trauma_registry_counts_path_2023, DataFrame)
- trauma_registry_counts_2024 = CSV.read(iowa_trauma_registry_counts_path_2024, DataFrame)
- trauma_registry_counts_2025 = CSV.read(iowa_trauma_registry_counts_path_2025, DataFrame)
- 
+ trauma_registry_counts_2020 = CSV.read(iowa_trauma_registry_counts_path_2020, DataFrame);
+ trauma_registry_counts_2021 = CSV.read(iowa_trauma_registry_counts_path_2021, DataFrame);
+ trauma_registry_counts_2022 = CSV.read(iowa_trauma_registry_counts_path_2022, DataFrame);
+ trauma_registry_counts_2023 = CSV.read(iowa_trauma_registry_counts_path_2023, DataFrame);
+ trauma_registry_counts_2024 = CSV.read(iowa_trauma_registry_counts_path_2024, DataFrame);
+ trauma_registry_counts_2025 = CSV.read(iowa_trauma_registry_counts_path_2025, DataFrame);
 ```
 
-```{julia data_manipulation, include=FALSE}
+```{julia}
 
 #| label: data_manipulation
+#| echo: false
+#| include: false
+#| output: false
 
 # union all rows from files and select the needed variables
 trauma_registry_counts_2020_2025 = @chain trauma_registry_counts_2020 begin
@@ -123,7 +134,7 @@ trauma_registry_counts_2020_2025 = @chain trauma_registry_counts_2020 begin
     trauma_registry_counts_2025
     )
     @select(year, facility, total)
-end
+end;
 
 # pivot columns wider
 trauma_registry_counts_2020_2025_pivot = @chain trauma_registry_counts_2020_2025 begin 
@@ -146,7 +157,7 @@ trauma_registry_counts_2020_2025_pivot = @chain trauma_registry_counts_2020_2025
         `2024` = `2024_function`,
         `2025` = `2025_function`
     )
-end
+end;
 
 # finalize data by adding in differences between years 
 trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025_pivot begin
@@ -159,37 +170,56 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         diff_2025 = `2025` - `2024`,
     )
     @mutate(
-        mean_records = round(mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        var_records = round(var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        sd_records = round(std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)), digits = 3),
-        mean_diff = round(mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
-        var_diff = round(var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3),
-        sd_diff = round(std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)), digits = 3)
+        mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025))
     )
     @mutate(
-        z_score_diff_2021 = div(diff_2021, sd_diff),
-        z_score_diff_2022 = div(diff_2022, sd_diff),
-        z_score_diff_2023 = div(diff_2023, sd_diff),
-        z_score_diff_2024 = div(diff_2024, sd_diff),
-        z_score_diff_2025 = div(diff_2025, sd_diff)
+        pct_2021 = (diff_2021) / `2020`,
+        pct_2022 = (diff_2022) / `2021`,
+        pct_2023 = (diff_2023) / `2022`,
+        pct_2024 = (diff_2024) / `2023`,
+        pct_2025 = (diff_2025) / `2024`
     )
     @mutate(
-        anomaly_2021 = abs(z_score_diff_2021) > 1,
-        anomaly_2022 = abs(z_score_diff_2022) > 1,
-        anomaly_2023 = abs(z_score_diff_2023) > 1,
-        anomaly_2024 = abs(z_score_diff_2024) > 1,
-        anomaly_2025 = abs(z_score_diff_2025) > 1
+        z_score_diff_2021 = (diff_2021 - mean_diff) / sd_diff,
+        z_score_diff_2022 = (diff_2022 - mean_diff) / sd_diff,
+        z_score_diff_2023 = (diff_2023 - mean_diff) / sd_diff,
+        z_score_diff_2024 = (diff_2024 - mean_diff) / sd_diff,
+        z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff
     )
     @mutate(
-        any_anomaly = any(c(
-            anomaly_2021,
-            anomaly_2022,
-            anomaly_2023,
-            anomaly_2024,
-            anomaly_2025
+        z_anomaly_2021 = abs(z_score_diff_2021) >= 2,
+        z_anomaly_2022 = abs(z_score_diff_2022) >= 2,
+        z_anomaly_2023 = abs(z_score_diff_2023) >= 2,
+        z_anomaly_2024 = abs(z_score_diff_2024) >= 2,
+        z_anomaly_2025 = abs(z_score_diff_2025) >= 2,
+        pct_anomaly_2021 = abs(pct_2021) >= 1,
+        pct_anomaly_2022 = abs(pct_2022) >= 1,
+        pct_anomaly_2023 = abs(pct_2023) >= 1,
+        pct_anomaly_2024 = abs(pct_2024) >= 1,
+        pct_anomaly_2025 = abs(pct_2025) >= 1
+		)
+    @mutate(
+        any_z_anomaly = any(c(
+            z_anomaly_2021,
+            z_anomaly_2022,
+            z_anomaly_2023,
+            z_anomaly_2024,
+            z_anomaly_2025,
+        )),
+		any_pct_anomaly = any(c(
+            pct_anomaly_2021,
+            pct_anomaly_2022,
+            pct_anomaly_2023,
+            pct_anomaly_2024,
+            pct_anomaly_2025,
         ))
     )
-end
+end;
 
 # Before additional data manipulation and modeling, plot differences
 diff_long =
@@ -204,8 +234,19 @@ diff_long =
         year = replace.(year, "diff_" => ""),
         sign = ifelse(diff .< 0, "negative", "positive")
     )
-end
+end;
 
+# subset the table with columns we want to see and fit
+quarto_table = @chain trauma_registry_counts_2020_2025_final begin
+    @filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 | z_anomaly_2025 == true)
+    @select :facility, `2024`, `2025`, :mean_records, :diff_2025, :mean_diff
+    @arrange facility
+end;
+
+# anomalous facilities list
+#= anomalous_facilities = @chain quarto_table begin
+    @filter 
+end =#
 ```
 
 # Introduction
@@ -216,18 +257,20 @@ This report examines annual reporting differences from 2020 through 2025 for all
 The objective is not to infer causation but to support registry data validation, highlight facilities requiring follow‑up, and strengthen the integrity of statewide trauma surveillance.
 
 # Test table of 2025 results
-```{julia test_table, echo=TRUE}
+```{julia}
 
-# subset the table with columns we want to see and fit
-quarto_table = @chain trauma_registry_counts_2020_2025_final begin
-    @select :facility, :mean_records, :sd_records, :mean_diff, :sd_diff, contains("2025")
-end
+#| label: test_table
+#| include: true
+#| output: asis
 
-PrettyTables.pretty_table(
-    quarto_table,
-    column_labels=names(quarto_table),
+# utilize PrettyTables for a quick printout
+    PrettyTables.pretty_table(
+    quarto_table;
+    backend = :latex,
+    column_labels=["Facility", "2024", "2025", "Avg", "Difference", "Avg Diff"],
     show_row_number_column=false,
-    title="Facilities with Anomalous "
+    alignment = :c,
+    title="Facilities with Anomalous Reporting in $year"
 )
 
 ```

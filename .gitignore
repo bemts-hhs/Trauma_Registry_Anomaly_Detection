@@ -1,2 +1,9 @@
 .env
 /plots
+report.pdf
+/output
+report.aux
+report.aux
+report.log
+report.qmd
+anomaly_table.xlsx

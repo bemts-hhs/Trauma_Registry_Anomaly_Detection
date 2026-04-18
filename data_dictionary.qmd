@@ -1,0 +1,48 @@
+---
+title: "Data Dictionary for Facility Reporting Variability Indicators"
+format:
+  pdf:
+    pdf-engine: lualatex
+    mainfont: "Work Sans"
+    fontsize: 12pt
+    geometry: margin=1in
+    number-sections: false
+    colorlinks: true
+    linkcolor: blue
+    toc: false
+---
+
+# `facility`
+Name of the Iowa trauma facility. Use as a grouping key for all reporting and anomaly detection analyses.
+
+# `2024`
+Total number of trauma registry records submitted by the facility for calendar year 2024.
+
+# `2025`
+Total number of trauma registry records submitted by the facility for calendar year 2025.
+
+# `diff_2025`
+Change in reporting from 2024 to 2025. Computed as 2025 − 2024. Positive values indicate increased reporting; negative values indicate decreases.
+
+# `mean_records`
+Arithmetic mean of annual reporting volumes across 2020–2025. Used to contextualize reporting levels relative to historical patterns.
+
+# `mean_diff`
+Mean of annual year‑to‑year differences across 2021–2025. Indicates typical annual variability for the facility.
+
+# `total_2020_2025`
+Total trauma cases reported across the full 2020–2025 period. Proxy indicator of facility size and case load.
+
+# `pct_2025`
+Proportional change from 2024 to 2025. Computed as $\frac{(2025 − 2024)}{2024}$. Values above 1 indicate a >100% increase, and values below −1 indicate reporting decreased by more than 100%.
+
+# `z_score_diff_2025`
+Standardized 2025 difference score:
+$\frac{(diff_{2025} − mean_{diff})}{standard\_deviation_{diff}}$
+Used to identify unusually large deviations from each facility’s typical reporting variability.
+
+# `z_anomaly_2025`
+Logical flag indicating whether the 2025 difference is an extreme outlier based on Z‑score threshold (|Z| ≥ 1.5). Indicates statistically unusual reporting changes.
+
+# `pct_anomaly_2025`
+Logical flag indicating whether the proportional change exceeded ±50% relative to 2024. Useful for identifying large abrupt operational or data‑quality changes.

@@ -48,7 +48,6 @@ Pkg.instantiate()
 # Load packages
 using Tidier
 using TidierDates
-using Dates
 using TidierPlots
 using DotEnv
 using CSV

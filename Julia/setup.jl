@@ -10,7 +10,7 @@ Pkg.activate(".");
 Pkg.instantiate();
 
 # only need to install packages the first time
-# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "DotEnv", "CSV", "XLSX", "DataFrames", "Quarto"])
+# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "Dates", "DotEnv", "CSV", "XLSX", "DataFrames", "Quarto"])
 
 # Load packages
 using Tidier

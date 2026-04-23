@@ -1,0 +1,49 @@
+---
+title: "Data Dictionary for Facility Reporting Variability Indicators"
+format:
+  pdf:
+    pdf-engine: lualatex
+    mainfont: "Work Sans"
+    fontsize: 12pt
+    geometry: margin=1in
+    number-sections: false
+    colorlinks: true
+    linkcolor: blue
+    toc: false
+---
+
+## `facility`
+Name of the Iowa trauma facility. Used as the primary grouping variable for reporting and anomaly detection.
+
+## `2024`
+Total number of trauma registry records submitted for calendar year 2024.
+
+## `2025`
+Total number of trauma registry records submitted for calendar year 2025.
+
+## `diff_2025`
+Year-to-year differences in reporting, calculated as $current_{year}-prior_{year}$.
+
+## `mean_records`
+Mean annual reporting volume across 2020–2025.
+
+## `mean_diff`
+Mean of annual year-to-year differences across 2021–2025.
+
+## `total_2020_2025`
+Total number of trauma registry records submitted from 2020–2025.
+
+## `pct_2025`
+Proportional year-to-year change, calculated as $\frac{(current_{year} − previous_{year})}{previous_{year}}$.
+
+## `z_score_diff_2025`
+Standardized year-to-year difference relative to each facility’s historical variability.
+
+## `z_anomaly_2025`
+Indicator for whether the standardized year-to-year change meets the anomaly threshold $(|Z| ≥ 1.5)$.
+
+## `pct_anomaly_2025`
+Indicator for whether the proportional year-to-year change exceeds $±50\%$.
+
+## `date_data`
+Calendar date (YYYY‑MM‑DD) on which the dataset was refreshed. Documents the data extraction date used for the reporting period.

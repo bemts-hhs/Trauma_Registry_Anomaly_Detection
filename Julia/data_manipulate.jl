@@ -126,7 +126,7 @@ diff_distribution_plot = ggplot(
 						 facet_wrap(:year, scales = "free") +
 						 theme_minimal();
 
-draw_ggplot(diff_distribution_plot, (1000, 800));
+draw_ggplot(diff_distribution_plot, (1000, 800))
 
 # plot the distribution of the percent differences
 pct_diff_distribution_plot = ggplot(
@@ -138,7 +138,7 @@ pct_diff_distribution_plot = ggplot(
 							 facet_wrap(:year, scales = "free") +
 							 theme_minimal();
 
-draw_ggplot(pct_diff_distribution_plot, (1000, 800));
+draw_ggplot(pct_diff_distribution_plot, (1000, 800))
 
 # Plots
 # Get unique facility list
@@ -198,26 +198,39 @@ for f in facilities
 end;
 
 # plot all differences over the years to assess the distribution
-plot_all_diffs =
-	ggplot(diff_long, aes(x = :year, y = :diff)) +
-	geom_rainclouds(
-		plot_boxplots = true,
-		show_boxplot_outliers = true,
-		show_median = true,
-		color = :blue,
-		fill = :coral,
-		size = 5,
-		stroke = 0,
-	) +
-	labs(
-		title = "Distribution of Reporting Differences Across Facilities",
-		x = "",
-		y = "Difference",
-	) +
-	theme_minimal();
 
-# save plot
-ggsave(plot_all_diffs, "plots/diffplots_all/diffplots_all.png"; width = 1200, height = 700);
+for yr in unique(diff_long.year)
+    plot_all_diffs =
+        ggplot(
+            subset(
+				diff_long, 
+				:diff => x -> .!isnan.(x), 
+				:diff => x -> .!ismissing.(x), 
+				:diff => x -> isfinite.(x),
+				:year => year -> year .== yr
+				), 
+			aes(x=:year, y=:diff)
+        ) +
+        geom_rainclouds(
+            plot_boxplots=true,
+            show_boxplot_outliers=true,
+            show_median=true,
+            color=:blue,
+            fill=:coral,
+            size=5,
+            stroke=0
+        ) +
+        labs(
+            title="Distribution of Reporting Differences Across Facilities in $yr",
+            x="",
+            y="Difference",
+        ) +
+        theme_minimal()
+
+    # save plot
+    ggsave(plot_all_diffs, "plots/diffplots_all/diffplots_all_$(yr).png"; width=1000, height=1000 / (16 / 9))
+
+end;
 
 # subset the table with columns we want to see and fit
 anomaly_table = @chain trauma_registry_counts_2020_2025_final begin
@@ -228,3 +241,9 @@ end;
 
 # export anomaly_table to XLSX
 XLSX.writetable("./output/anomaly_table.xlsx", Tables.columntable(anomaly_table); sheetname = "anomalies")
+
+# export the full table
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs.xlsx", Tables.columntable(trauma_registry_counts_2020_2025_final); sheetname = "data")
+
+# export the long data
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_long.xlsx", Tables.columntable(diff_long); sheetname = "data")

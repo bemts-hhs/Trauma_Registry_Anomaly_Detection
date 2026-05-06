@@ -3,42 +3,44 @@
 ###_____________________________________________________________________________
 
 # union all rows from files and select the needed variables
-trauma_registry_counts_2020_2025 = @chain trauma_registry_counts_2020 begin
+trauma_registry_counts_2020_2026 = @chain trauma_registry_counts_2020 begin
 	@bind_rows(
 		trauma_registry_counts_2021,
 		trauma_registry_counts_2022,
 		trauma_registry_counts_2023,
 		trauma_registry_counts_2024,
-		trauma_registry_counts_2025
+		trauma_registry_counts_2025,
+		trauma_registry_counts_2026
 	)
 	@select(year, facility, total)
 end;
 
 # pivot columns wider
-trauma_registry_counts_2020_2025_pivot = @chain trauma_registry_counts_2020_2025 begin
+trauma_registry_counts_2020_2026_pivot = @chain trauma_registry_counts_2020_2026 begin
 	@pivot_wider(
 		names_from = year,
 		values_from = total
 	)
 	@mutate(
-		across(`2020`:`2025`, x -> coalesce.(x, 0))
+		across(`2020`:`2026`, x -> coalesce.(x, 0))
 	)
 	@mutate(
-		total_2020_2025 = `2020_function` + `2021_function` + `2022_function` + `2023_function` + `2024_function` + `2025_function`
+		total_2020_2026 = `2020_function` + `2021_function` + `2022_function` + `2023_function` + `2024_function` + `2025_function` + `2026_function`
 	)
-	@select(facility, `2020_function`:`2025_function`, total_2020_2025)
+	@select(facility, `2020_function`:`2026_function`, total_2020_2026)
 	@rename(
 		`2020` = `2020_function`,
 		`2021` = `2021_function`,
 		`2022` = `2022_function`,
 		`2023` = `2023_function`,
 		`2024` = `2024_function`,
-		`2025` = `2025_function`
+		`2025` = `2025_function`,
+		`2026` = `2026_function`
 	)
 end;
 
 # finalize data by adding in differences between years 
-trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025_pivot begin
+trauma_registry_counts_2020_2026_final = @chain trauma_registry_counts_2020_2026_pivot begin
 	@mutate(
 		facility = replace.(facility, "\x96" => "–"),  # en dash,
 		diff_2021 = `2021` - `2020`,
@@ -46,28 +48,32 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
 		diff_2023 = `2023` - `2022`,
 		diff_2024 = `2024` - `2023`,
 		diff_2025 = `2025` - `2024`,
+		diff_2026 = `2026` - `2025`
 	)
 	@mutate(
-		mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-		var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-		sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-		mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-		var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-		sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025))
+		mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
+		var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
+		sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
+		mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026)),
+		var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026)),
+		sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026))
 	)
 	@mutate(
 		pct_2021 = (diff_2021) / `2020`,
 		pct_2022 = (diff_2022) / `2021`,
 		pct_2023 = (diff_2023) / `2022`,
 		pct_2024 = (diff_2024) / `2023`,
-		pct_2025 = (diff_2025) / `2024`
+		pct_2025 = (diff_2025) / `2024`,
+		pct_2026 = (diff_2026) / `2025`
 	)
 	@mutate(
 		z_score_diff_2021 = (diff_2021 - mean_diff) / sd_diff,
 		z_score_diff_2022 = (diff_2022 - mean_diff) / sd_diff,
 		z_score_diff_2023 = (diff_2023 - mean_diff) / sd_diff,
 		z_score_diff_2024 = (diff_2024 - mean_diff) / sd_diff,
-		z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff
+		z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff,
+		z_score_diff_2026 = (diff_2026 - mean_diff) / sd_diff
+
 	)
 	@mutate(
 		z_anomaly_2021 = abs(z_score_diff_2021) >= 1.5,
@@ -75,11 +81,13 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
 		z_anomaly_2023 = abs(z_score_diff_2023) >= 1.5,
 		z_anomaly_2024 = abs(z_score_diff_2024) >= 1.5,
 		z_anomaly_2025 = abs(z_score_diff_2025) >= 1.5,
+		z_anomaly_2026 = abs(z_score_diff_2026) >= 1.5,
 		pct_anomaly_2021 = abs(pct_2021) >= 0.5,
 		pct_anomaly_2022 = abs(pct_2022) >= 0.5,
 		pct_anomaly_2023 = abs(pct_2023) >= 0.5,
 		pct_anomaly_2024 = abs(pct_2024) >= 0.5,
-		pct_anomaly_2025 = abs(pct_2025) >= 0.5
+		pct_anomaly_2025 = abs(pct_2025) >= 0.5,
+		pct_anomaly_2026 = abs(pct_2026) >= 0.5
 	)
 	@mutate(
 		any_z_anomaly = any(c(
@@ -88,6 +96,7 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
 			z_anomaly_2023,
 			z_anomaly_2024,
 			z_anomaly_2025,
+			z_anomaly_2026
 		)),
 		any_pct_anomaly = any(c(
 			pct_anomaly_2021,
@@ -95,6 +104,7 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
 			pct_anomaly_2023,
 			pct_anomaly_2024,
 			pct_anomaly_2025,
+			pct_anomaly_2026
 		)))
 	@mutate(
 		date_data = Date(Dates.now())
@@ -103,7 +113,7 @@ end;
 
 # Before additional data manipulation and modeling, plot differences
 diff_long =
-	@chain trauma_registry_counts_2020_2025_final begin
+	@chain trauma_registry_counts_2020_2026_final begin
 		@select(facility, contains(r"^(diff|pct)_\d{4}$"))
 		@pivot_longer(
 			contains(r"^(diff|pct)_\d{4}$"),
@@ -164,7 +174,7 @@ for f in facilities
 			stroke = 0,
 		) +
 		labs(
-			title = "Distribution of $f Reporting Differences 2021-2025",
+			title = "Distribution of $f Reporting Differences 2021-2026",
 			x = "",
 			y = "Difference",
 		) +
@@ -233,8 +243,8 @@ for yr in unique(diff_long.year)
 end;
 
 # subset the table with columns we want to see and fit
-anomaly_table = @chain trauma_registry_counts_2020_2025_final begin
-	@filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 | z_anomaly_2025 == true)
+anomaly_table = @chain trauma_registry_counts_2020_2026_final begin
+	@filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true)
 	@select :facility, `2024`, `2025`, :diff_2025, :mean_records, :mean_diff, contains("2025"), :date_data
 	@arrange facility
 end;
@@ -243,7 +253,7 @@ end;
 XLSX.writetable("./output/anomaly_table.xlsx", Tables.columntable(anomaly_table); sheetname = "anomalies")
 
 # export the full table
-XLSX.writetable("./output/iowa_trauma_registry_counts_diffs.xlsx", Tables.columntable(trauma_registry_counts_2020_2025_final); sheetname = "data")
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs.xlsx", Tables.columntable(trauma_registry_counts_2020_2026_final); sheetname = "data")
 
 # export the long data
 XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_long.xlsx", Tables.columntable(diff_long); sheetname = "data")

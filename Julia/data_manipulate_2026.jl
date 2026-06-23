@@ -51,9 +51,9 @@ trauma_registry_counts_2020_2026_final = @chain trauma_registry_counts_2020_2026
 		diff_2026 = `2026` - `2025`
 	)
 	@mutate(
-		mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
-		var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
-		sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2025`)),
+		mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2026`)),
+		var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2026`)),
+		sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`, `2026`)),
 		mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026)),
 		var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026)),
 		sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025, diff_2026))
@@ -154,57 +154,68 @@ draw_ggplot(pct_diff_distribution_plot, (1000, 800))
 # Get unique facility list
 facilities = unique(diff_long.facility);
 
+# beginning year
+start_year = minimum(parse.(Int, unique(diff_long.year)));
+
+# Define the year
+end_year = maximum(parse.(Int, unique(diff_long.year)));
+
+# Define report interval
+report_years = string(start_year) * "-" * string(end_year);
+
 # For loop to make plots for each facility to examine 
 # the distribution of their reporting differences over the
 # years
 for f in facilities
 
-	# subset current facility
-	df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
+    # subset current facility
+    df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
 
-	# build raincloud plots
-	p_rain =
-		ggplot(df_f, aes(x = :facility, y = :diff)) +
-		geom_rainclouds(
-			plot_boxplots = true,
-			show_boxplot_outliers = true,
-			show_median = true,
-			fill = :cyan,
-			size = 10,
-			stroke = 0,
-		) +
-		labs(
-			title = "Distribution of $f Reporting Differences 2021-2026",
-			x = "",
-			y = "Difference",
-		) +
-		theme_minimal()
+    # build raincloud plots
+    p_rain =
+        ggplot(df_f, aes(x=:facility, y=:diff)) +
+        geom_rainclouds(
+            plot_boxplots=true,
+            show_boxplot_outliers=true,
+            show_median=true,
+            fill=:cyan,
+            size=10,
+            stroke=0,
+        ) +
+        labs(
+            title="Distribution of $f Reporting Differences",
+            x="",
+            y="Difference",
+			subtitle = "Reporting Years: $(report_years)"
+        ) +
+        theme_minimal()
 
-	# save each raincloud plot
-	ggsave(p_rain, "plots/boxplots/diff_boxplot_$(f).png")
+    # save each raincloud plot
+    ggsave(p_rain, "plots/boxplots_$(end_year)/diff_boxplot_$(f)_$(start_year)_$(end_year).png")
 
 end;
 
 # move on to a loop for the column plots
 for f in facilities
 
-	# subset current facility
-	df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
+    # subset current facility
+    df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
 
-	# create column plots
-	p_col =
-		ggplot(df_f) +
-		geom_hline(yintercept = 0, color = :darkgray, linestyle = :solid) +
-		geom_col(aes(x = :year, y = :diff), strokewidth = 1, fill = :cyan) +
-		labs(
-			title = "$f Reporting Differences 2021-2025",
-			x = "",
-			y = "Difference",
-		) +
-		theme_minimal()
+    # create column plots
+    p_col =
+        ggplot(df_f) +
+        geom_hline(yintercept=0, color=:darkgray, linestyle=:solid) +
+        geom_col(aes(x=:year, y=:diff), strokewidth=1, fill=:cyan) +
+        labs(
+            title="$f Reporting Differences",
+            x="",
+            y="Difference",
+			subtitle = "Reporting Years: $(report_years)"
+        ) +
+        theme_minimal()
 
-	# save each plot
-	ggsave(p_col, "plots/columnplots/diff_columnplot_$(f).png")
+    # save each plot
+    ggsave(p_col, "plots/columnplots_$(end_year)/diff_columnplot_$(f)_$(start_year)_$(end_year).png")
 end;
 
 # plot all differences over the years to assess the distribution
@@ -244,16 +255,16 @@ end;
 
 # subset the table with columns we want to see and fit
 anomaly_table = @chain trauma_registry_counts_2020_2026_final begin
-	@filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true)
-	@select :facility, `2024`, `2025`, :diff_2025, :mean_records, :mean_diff, contains("2025"), :date_data
+	@filter .!isnan.(pct_2026) & .!ismissing.(pct_2026) & isfinite.(pct_2026) & (pct_anomaly_2026 == true | z_anomaly_2026 == true)
+	@select :facility, `2025`, `2026`, :diff_2026, :mean_records, :mean_diff, contains("2026"), :date_data
 	@arrange facility
 end;
 
 # export anomaly_table to XLSX
-XLSX.writetable("./output/anomaly_table.xlsx", Tables.columntable(anomaly_table); sheetname = "anomalies")
+XLSX.writetable("./output/anomaly_table_$(end_year).xlsx", Tables.columntable(anomaly_table); sheetname = "anomalies")
 
 # export the full table
-XLSX.writetable("./output/iowa_trauma_registry_counts_diffs.xlsx", Tables.columntable(trauma_registry_counts_2020_2026_final); sheetname = "data")
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_$(end_year).xlsx", Tables.columntable(trauma_registry_counts_2020_2026_final); sheetname = "data")
 
 # export the long data
-XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_long.xlsx", Tables.columntable(diff_long); sheetname = "data")
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_long_$(end_year).xlsx", Tables.columntable(diff_long); sheetname = "data")

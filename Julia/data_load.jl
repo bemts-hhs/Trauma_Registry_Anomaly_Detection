@@ -3,29 +3,34 @@
 ###_____________________________________________________________________________
 
 # Simple validation for missing paths
-required_paths = [
-	("2020", iowa_trauma_registry_counts_path_2020),
-	("2021", iowa_trauma_registry_counts_path_2021),
-	("2022", iowa_trauma_registry_counts_path_2022),
-	("2023", iowa_trauma_registry_counts_path_2023),
-	("2024", iowa_trauma_registry_counts_path_2024),
-	("2025", iowa_trauma_registry_counts_path_2025),
-	("2026", iowa_trauma_registry_counts_path_2026),
-];
+required_paths = iowa_trauma_registry_counts_path
 
-for (yr, p) in required_paths
-	if isempty(p)
-		@warn "Path for $yr is empty. Update .env before attempting to load data."
-	end
-end;
+	if isempty(required_paths)
+		@warn "Path for $required_paths is empty. Update .env before attempting to load data."
+    else 
+        @info "Path for $required_paths is valid."
+	end;
 
 # Load all project data for anomaly detection via environment variable paths
-trauma_registry_counts_2020 = CSV.read(iowa_trauma_registry_counts_path_2020, DataFrame);
-trauma_registry_counts_2021 = CSV.read(iowa_trauma_registry_counts_path_2021, DataFrame);
-trauma_registry_counts_2022 = CSV.read(iowa_trauma_registry_counts_path_2022, DataFrame);
-trauma_registry_counts_2023 = CSV.read(iowa_trauma_registry_counts_path_2023, DataFrame);
-trauma_registry_counts_2024 = CSV.read(iowa_trauma_registry_counts_path_2024, DataFrame);
-trauma_registry_counts_2025 = CSV.read(iowa_trauma_registry_counts_path_2025, DataFrame);
-trauma_registry_counts_2026 = CSV.read(iowa_trauma_registry_counts_path_2026, DataFrame);
+trauma_registry_counts_file = DataFrames.DataFrame(
+    XLSX.readtable(
+        iowa_trauma_registry_counts_path, "count_of_incidents_by_facility_"
+    )
+);
 
 # Use @glimpse() macro to examine each dataframe.
+@glimpse(trauma_registry_counts_file)
+
+# clean names
+trauma_registry_counts = @chain trauma_registry_counts_file begin
+    @rename_with col -> str_remove_all(col, r"\s*\(.+\)$")
+    @clean_names()
+    @mutate facility_id = ifelse(
+        ismissing(facility_id), 9999, facility_id
+    )
+    @mutate across(`2020`:`2026`, x -> coalesce.(x, 0))
+    @select -(`2020`:`2026`)
+    @rename_with col -> str_remove_all(col, r"_function$")
+    @relocate(starts_with("count_of_incidents"), after = `2026`)
+
+end;

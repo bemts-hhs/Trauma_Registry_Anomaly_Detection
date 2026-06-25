@@ -2,47 +2,10 @@
 # Prepare data for modeling and analysis
 ###_____________________________________________________________________________
 
-# union all rows from files and select the needed variables
-trauma_registry_counts_2020_2026 = @chain trauma_registry_counts_2020 begin
-	@bind_rows(
-		trauma_registry_counts_2021,
-		trauma_registry_counts_2022,
-		trauma_registry_counts_2023,
-		trauma_registry_counts_2024,
-		trauma_registry_counts_2025,
-		trauma_registry_counts_2026
-	)
-	@select(year, facility, total)
-end;
-
-# pivot columns wider
-trauma_registry_counts_2020_2026_pivot = @chain trauma_registry_counts_2020_2026 begin
-	@pivot_wider(
-		names_from = year,
-		values_from = total
-	)
-	@mutate(
-		across(`2020`:`2026`, x -> coalesce.(x, 0))
-	)
-	@mutate(
-		total_2020_2026 = `2020_function` + `2021_function` + `2022_function` + `2023_function` + `2024_function` + `2025_function` + `2026_function`
-	)
-	@select(facility, `2020_function`:`2026_function`, total_2020_2026)
-	@rename(
-		`2020` = `2020_function`,
-		`2021` = `2021_function`,
-		`2022` = `2022_function`,
-		`2023` = `2023_function`,
-		`2024` = `2024_function`,
-		`2025` = `2025_function`,
-		`2026` = `2026_function`
-	)
-end;
-
 # finalize data by adding in differences between years 
-trauma_registry_counts_2020_2026_final = @chain trauma_registry_counts_2020_2026_pivot begin
+trauma_registry_counts_2020_2026_final = @chain trauma_registry_counts begin
 	@mutate(
-		facility = replace.(facility, "\x96" => "–"),  # en dash,
+        facility_name = replace.(facility_name, r"^\s+|/Health\s*Center|\x96|,.+" => ""),
 		diff_2021 = `2021` - `2020`,
 		diff_2022 = `2022` - `2021`,
 		diff_2023 = `2023` - `2022`,
@@ -114,7 +77,7 @@ end;
 # Before additional data manipulation and modeling, plot differences
 diff_long =
 	@chain trauma_registry_counts_2020_2026_final begin
-		@select(facility, contains(r"^(diff|pct)_\d{4}$"))
+		@select(facility_name, contains(r"^(diff|pct)_\d{4}$"))
 		@pivot_longer(
 			contains(r"^(diff|pct)_\d{4}$"),
 			names_to = :year,
@@ -152,10 +115,10 @@ draw_ggplot(pct_diff_distribution_plot, (1000, 800))
 
 # Plots
 # Get unique facility list
-facilities = unique(diff_long.facility);
+facilities = unique(diff_long.facility_name);
 
 # beginning year
-start_year = minimum(parse.(Int, unique(diff_long.year)));
+start_year = minimum(parse.(Int, unique(diff_long.year))) - 1;
 
 # Define the year
 end_year = maximum(parse.(Int, unique(diff_long.year)));
@@ -169,11 +132,11 @@ report_years = string(start_year) * "-" * string(end_year);
 for f in facilities
 
     # subset current facility
-    df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
+    df_f = subset(diff_long, :facility_name => x -> x .== f, :measure => m -> occursin.("diff", m))
 
     # build raincloud plots
     p_rain =
-        ggplot(df_f, aes(x=:facility, y=:diff)) +
+        ggplot(df_f, aes(x=:facility_name, y=:diff)) +
         geom_rainclouds(
             plot_boxplots=true,
             show_boxplot_outliers=true,
@@ -183,10 +146,10 @@ for f in facilities
             stroke=0,
         ) +
         labs(
-            title="Distribution of $f Reporting Differences",
+            title="$f",
+            subtitle="Distribution of Reporting Differences $(report_years)",
             x="",
-            y="Difference",
-			subtitle = "Reporting Years: $(report_years)"
+            y="Difference"
         ) +
         theme_minimal()
 
@@ -199,7 +162,7 @@ end;
 for f in facilities
 
     # subset current facility
-    df_f = subset(diff_long, :facility => x -> x .== f, :measure => m -> occursin.("diff", m))
+    df_f = subset(diff_long, :facility_name => x -> x .== f, :measure => m -> occursin.("diff", m))
 
     # create column plots
     p_col =
@@ -207,15 +170,26 @@ for f in facilities
         geom_hline(yintercept=0, color=:darkgray, linestyle=:solid) +
         geom_col(aes(x=:year, y=:diff), strokewidth=1, fill=:cyan) +
         labs(
-            title="$f Reporting Differences",
+            title="$f",
+            subtitle = "Reporting Differences $(report_years)",
             x="",
             y="Difference",
-			subtitle = "Reporting Years: $(report_years)"
         ) +
         theme_minimal()
 
     # save each plot
     ggsave(p_col, "plots/columnplots_$(end_year)/diff_columnplot_$(f)_$(start_year)_$(end_year).png")
+end;
+
+#= 
+remove the grand total from the dataframe to avoid including that in the empirical distribution
+ =#
+
+diff_long_dist = @chain diff_long begin
+    @filter facility_name != "Grand Total"
+    @filter !isnan(diff)
+    @filter !ismissing(diff)
+    @filter isfinite(diff)
 end;
 
 # plot all differences over the years to assess the distribution
@@ -256,8 +230,8 @@ end;
 # subset the table with columns we want to see and fit
 anomaly_table = @chain trauma_registry_counts_2020_2026_final begin
 	@filter .!isnan.(pct_2026) & .!ismissing.(pct_2026) & isfinite.(pct_2026) & (pct_anomaly_2026 == true | z_anomaly_2026 == true)
-	@select :facility, `2025`, `2026`, :diff_2026, :mean_records, :mean_diff, contains("2026"), :date_data
-	@arrange facility
+	@select :facility_name, `2025`, `2026`, :diff_2026, :mean_records, :mean_diff, contains("2026"), :date_data
+	@arrange facility_name
 end;
 
 # export anomaly_table to XLSX

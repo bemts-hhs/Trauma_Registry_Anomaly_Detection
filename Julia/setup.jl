@@ -29,6 +29,8 @@ if !isfile(".env")
     write(".env", """
 IOWA_TRAUMA_REGISTRY_COUNT_PATH=
 """)
+else
+    @info "File `.env` was found in the target directory."
 end;
 
 # Load .env file into ENV[]

@@ -90,7 +90,7 @@ diff_long =
 
 # plot the distribution of differences
 diff_distribution_plot = ggplot(
-                             subset(diff_long, :measure => m -> occursin.("diff", m)),
+                             subset(diff_long, :measure => m -> occursin.("diff", m), :facility_name => f -> .!occursin.(r"grand total"i, f)),
                          ) +
                          geom_density(@aes(x = diff, fill = year)) +
                          facet_wrap(:year, scales="free") +
@@ -101,7 +101,7 @@ draw_ggplot(diff_distribution_plot, (1000, 800))
 # plot the distribution of the percent differences
 pct_diff_distribution_plot = ggplot(
                                  subset(diff_long, :measure => m -> occursin.("pct", m),
-                                     :diff => d -> isfinite.(d),
+                                     :diff => d -> isfinite.(d), :facility_name => f -> .!occursin.(r"grand total"i, f)
                                  ),
                              ) +
                              geom_density(@aes(x = diff, fill = year)) +
@@ -183,7 +183,7 @@ remove the grand total from the dataframe to avoid including that in the empiric
  =#
 
 diff_long_dist = @chain diff_long begin
-    @filter facility_name != "Grand Total"
+    @filter .!occursin.(r"grand total"i, facility_name)
     @filter !isnan(diff)
     @filter !ismissing(diff)
     @filter isfinite(diff)
@@ -191,16 +191,10 @@ end;
 
 # plot all differences over the years to assess the distribution
 
-for yr in unique(diff_long.year)
+for yr in unique(diff_long_dist.year)
     plot_all_diffs =
         ggplot(
-            subset(
-                diff_long,
-                :diff => x -> .!isnan.(x),
-                :diff => x -> .!ismissing.(x),
-                :diff => x -> isfinite.(x),
-                :year => year -> year .== yr
-            ),
+            subset(diff_long_dist, :year => y -> y .== yr),
             aes(x=:year, y=:diff)
         ) +
         geom_rainclouds(

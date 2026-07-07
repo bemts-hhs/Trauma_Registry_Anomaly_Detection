@@ -14,7 +14,7 @@ required_paths = iowa_trauma_registry_counts_path
 # Load all project data for anomaly detection via environment variable paths
 trauma_registry_counts_file = DataFrames.DataFrame(
     XLSX.readtable(
-        iowa_trauma_registry_counts_path, "count_of_incidents_by_facility_"
+        iowa_trauma_registry_counts_path, "Count-Of-Incidents-by-Facility-"
     )
 );
 

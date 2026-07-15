@@ -10,7 +10,7 @@ Pkg.activate(".");
 Pkg.instantiate();
 
 # only need to install packages the first time
-# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "Dates", "DotEnv", "CSV", "XLSX", "DataFrames", "Quarto"]);
+# Pkg.add(["Tidier", "TidierPlots", "TidierDates", "Dates", "DotEnv", "CSV", "XLSX", "DataFrames", "Quarto", "PrettyTables", "Statistics", "Distributions"]);
 
 # Load packages
 using Tidier
@@ -23,6 +23,8 @@ using XLSX
 using DataFrames
 using Quarto
 using PrettyTables
+using Statistics
+using Distributions
 
 # Create .env file if it does not exist
 if !isfile(".env")

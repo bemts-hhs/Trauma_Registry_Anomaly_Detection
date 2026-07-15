@@ -2,6 +2,9 @@
 # Prepare data for modeling and analysis - 2025
 ###_____________________________________________________________________________
 
+# first, include the custom predition interval function
+include("functions.jl")
+
 # remove data from years not part of this analysis
 trauma_registry_counts_2020_2025 = @chain trauma_registry_counts begin
     @mutate count_of_incidents_grand_total = count_of_incidents_grand_total - `2026`
@@ -24,7 +27,15 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
         mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
         var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-        sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025))
+        sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        counts_vector = c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)
+    )
+    @mutate(
+        pred_interval = Main.nb_pois_pred_interval(counts_vector, 0.9332)
+    )
+    @mutate(
+        pred_interval_lower = getindex.(pred_interval, 1),
+        pred_interval_upper = getindex.(pred_interval, 2)
     )
     @mutate(
         pct_2021 = (diff_2021) / `2020`,
@@ -49,7 +60,17 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         pct_anomaly_2022 = abs(pct_2022) >= 0.5,
         pct_anomaly_2023 = abs(pct_2023) >= 0.5,
         pct_anomaly_2024 = abs(pct_2024) >= 0.5,
-        pct_anomaly_2025 = abs(pct_2025) >= 0.5
+        pct_anomaly_2025 = abs(pct_2025) >= 0.5,
+        nb_pois_anomaly_2021 =
+            !((pred_interval_lower <= `2021` <= pred_interval_upper)),
+        nb_pois_anomaly_2022 =
+            !((pred_interval_lower <= `2022` <= pred_interval_upper)),
+        nb_pois_anomaly_2023 =
+            !((pred_interval_lower <= `2023` <= pred_interval_upper)),
+        nb_pois_anomaly_2024 =
+            !((pred_interval_lower <= `2024` <= pred_interval_upper)),
+        nb_pois_anomaly_2025 =
+            !((pred_interval_lower <= `2025` <= pred_interval_upper))
     )
     @mutate(
         any_z_anomaly = any(c(
@@ -65,7 +86,15 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
             pct_anomaly_2023,
             pct_anomaly_2024,
             pct_anomaly_2025
-        )))
+        )),
+        any_nb_pois_anomaly = any(c(
+            nb_pois_anomaly_2021,
+            nb_pois_anomaly_2022,
+            nb_pois_anomaly_2023,
+            nb_pois_anomaly_2024,
+            nb_pois_anomaly_2025
+        ))
+    )
     @mutate(
         date_data = DateTime(Dates.now())
     )
@@ -168,7 +197,7 @@ for f in facilities
         geom_col(aes(x=:year, y=:diff), strokewidth=1, fill=:cyan) +
         labs(
             title="$f",
-            subtitle = "Reporting Differences $(report_years)",
+            subtitle="Reporting Differences $(report_years)",
             x="",
             y="Difference",
         ) +
@@ -218,10 +247,93 @@ for yr in unique(diff_long_dist.year)
 
 end;
 
+# new long table with counts
+counts_long =
+    @chain trauma_registry_counts_2020_2025_final begin
+        @filter .!occursin.(r"grand total"i, facility_name)
+        @select(facility_name, contains(r"^\d{4}$"))
+        @pivot_longer(
+            contains(r"^\d{4}$"),
+            names_to = :year,
+            values_to = :count
+        )
+        @arrange facility_name
+    end;
+
+# For loop to make plots for each facility to examine 
+# the distribution of their reporting trends over the
+# years
+for f in facilities
+
+    # subset current facility
+    df_f = subset(counts_long, :facility_name => x -> x .== f)
+
+
+    # Skip trauma programs with no data or all-zero counts
+    if isempty(df_f) || all(df_f.count .== 0)
+        continue
+    end
+
+    # build raincloud plots
+    p_rain =
+        ggplot(df_f, aes(x=:facility_name, y=:count)) +
+        geom_rainclouds(
+            plot_boxplots=true,
+            show_boxplot_outliers=true,
+            show_median=true,
+            fill=:cyan,
+            size=10,
+            stroke=0,
+        ) +
+        labs(
+            title="$f",
+            subtitle="Distribution of Record Counts $(report_years)",
+            x="",
+            y="Record Count"
+        ) +
+        theme_minimal()
+
+    # save each raincloud plot
+    ggsave(p_rain, "plots/countplots_$(end_year)/countplot_$(f)_$(start_year)_$(end_year).png")
+
+end;
+
+# plot the overall counts of records across all trauma programs
+for yr in unique(counts_long.year)
+    plot_all_counts =
+        ggplot(
+            subset(
+                counts_long,
+                :year => year -> year .== yr
+            ),
+            aes(x=:year, y=:count)
+        ) +
+        geom_rainclouds(
+            plot_boxplots=true,
+            show_boxplot_outliers=true,
+            show_median=true,
+            color=:blue,
+            fill=:coral,
+            size=5,
+            stroke=0
+        ) +
+        labs(
+            title="Distribution of Record Counts",
+            subtitle="Across all Iowa trauma programs in $yr",
+            x="",
+            y="Record Count",
+        ) +
+        theme_minimal()
+
+    # save plot
+    ggsave(plot_all_counts, "plots/countplots_all/countplot_all_$(yr).png"; width=1000, height=1000 / (16 / 9))
+
+end;
+
 # subset the table with columns we want to see and fit
 anomaly_table = @chain trauma_registry_counts_2020_2025_final begin
-    @filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true)
-    @select :facility_name, `2024`, `2025`, :diff_2025, :mean_records, :mean_diff, contains("2025"), :date_data
+    @filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true | nb_pois_anomaly_2025 == true)
+    @select :facility_name, `2024`, `2025`, :diff_2025, :mean_records, :var_records, :sd_records, :pred_interval_lower, :pred_interval_upper, :mean_diff, contains("2025"), :date_data
     @arrange facility_name
 end;
 
@@ -229,7 +341,11 @@ end;
 XLSX.writetable("./output/anomaly_table_$(end_year).xlsx", Tables.columntable(anomaly_table); sheetname="anomalies")
 
 # export the full table
-XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_$(end_year).xlsx", Tables.columntable(trauma_registry_counts_2020_2025_final); sheetname="data")
+XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_$(end_year).xlsx", Tables.columntable(
+    @chain trauma_registry_counts_2020_2025_final begin
+        @select -pred_interval
+    end
+    ); sheetname="data")
 
 # export the long data
 XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_long_$(end_year).xlsx", Tables.columntable(diff_long); sheetname="data")

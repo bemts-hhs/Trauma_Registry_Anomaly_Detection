@@ -6,15 +6,17 @@
 include("functions.jl")
 
 # remove data from years not part of this analysis
-trauma_registry_counts_2020_2025 = @chain trauma_registry_counts begin
+trauma_registry_counts_2018_2025 = @chain trauma_registry_counts begin
     @mutate count_of_incidents_grand_total = count_of_incidents_grand_total - `2026`
     @select(-`2026`)
 end;
 
 # finalize data by adding in differences between years 
-trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025 begin
+trauma_registry_counts_2018_2025_final = @chain trauma_registry_counts_2018_2025 begin
     @mutate(
         facility_name = replace.(facility_name, r"^\s+|/Health\s*Center|\x96|,.+" => ""),
+        diff_2019 = `2019` - `2018`,
+        diff_2020 = `2020` - `2019`,
         diff_2021 = `2021` - `2020`,
         diff_2022 = `2022` - `2021`,
         diff_2023 = `2023` - `2022`,
@@ -22,13 +24,13 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         diff_2025 = `2025` - `2024`
     )
     @mutate(
-        mean_records = mean.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-        var_records = var.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-        sd_records = std.(c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
-        mean_diff = mean.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-        var_diff = var.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-        sd_diff = std.(c(diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
-        counts_vector = c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`)
+        mean_records = mean.(c(`2018`, `2019`, `2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        var_records = var.(c(`2018`, `2019`, `2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        sd_records = std.(c(`2018`, `2019`, `2020`, `2021`, `2022`, `2023`, `2024`, `2025`)),
+        mean_diff = mean.(c(diff_2019, diff_2020, diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        var_diff = var.(c(diff_2019, diff_2020, diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        sd_diff = std.(c(diff_2019, diff_2020, diff_2021, diff_2022, diff_2023, diff_2024, diff_2025)),
+        counts_vector = c(`2018`, `2019`, `2020`, `2021`, `2022`, `2023`, `2024`, `2025`)
     )
     @mutate(
         pred_interval = Main.nb_pois_pred_interval(counts_vector, 0.9332)
@@ -38,6 +40,8 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         pred_interval_upper = getindex.(pred_interval, 2)
     )
     @mutate(
+        pct_2019 = (diff_2019) / `2018`,
+        pct_2020 = (diff_2020) / `2019`,
         pct_2021 = (diff_2021) / `2020`,
         pct_2022 = (diff_2022) / `2021`,
         pct_2023 = (diff_2023) / `2022`,
@@ -45,22 +49,33 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
         pct_2025 = (diff_2025) / `2024`
     )
     @mutate(
+        z_score_diff_2019 = (diff_2019 - mean_diff) / sd_diff,
+        z_score_diff_2020 = (diff_2020 - mean_diff) / sd_diff,
         z_score_diff_2021 = (diff_2021 - mean_diff) / sd_diff,
         z_score_diff_2022 = (diff_2022 - mean_diff) / sd_diff,
         z_score_diff_2023 = (diff_2023 - mean_diff) / sd_diff,
         z_score_diff_2024 = (diff_2024 - mean_diff) / sd_diff,
-        z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff)
+        z_score_diff_2025 = (diff_2025 - mean_diff) / sd_diff
+    )
     @mutate(
+        z_anomaly_2019 = abs(z_score_diff_2019) >= 1.5,
+        z_anomaly_2020 = abs(z_score_diff_2020) >= 1.5,
         z_anomaly_2021 = abs(z_score_diff_2021) >= 1.5,
         z_anomaly_2022 = abs(z_score_diff_2022) >= 1.5,
         z_anomaly_2023 = abs(z_score_diff_2023) >= 1.5,
         z_anomaly_2024 = abs(z_score_diff_2024) >= 1.5,
         z_anomaly_2025 = abs(z_score_diff_2025) >= 1.5,
+        pct_anomaly_2019 = abs(pct_2019) >= 0.5,
+        pct_anomaly_2020 = abs(pct_2020) >= 0.5,
         pct_anomaly_2021 = abs(pct_2021) >= 0.5,
         pct_anomaly_2022 = abs(pct_2022) >= 0.5,
         pct_anomaly_2023 = abs(pct_2023) >= 0.5,
         pct_anomaly_2024 = abs(pct_2024) >= 0.5,
         pct_anomaly_2025 = abs(pct_2025) >= 0.5,
+        nb_pois_anomaly_2019 =
+            !((pred_interval_lower <= `2019` <= pred_interval_upper)),
+        nb_pois_anomaly_2020 =
+            !((pred_interval_lower <= `2020` <= pred_interval_upper)),
         nb_pois_anomaly_2021 =
             !((pred_interval_lower <= `2021` <= pred_interval_upper)),
         nb_pois_anomaly_2022 =
@@ -74,6 +89,8 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
     )
     @mutate(
         any_z_anomaly = any(c(
+            z_anomaly_2019,
+            z_anomaly_2020,
             z_anomaly_2021,
             z_anomaly_2022,
             z_anomaly_2023,
@@ -81,6 +98,8 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
             z_anomaly_2025
         )),
         any_pct_anomaly = any(c(
+            pct_anomaly_2019,
+            pct_anomaly_2020,
             pct_anomaly_2021,
             pct_anomaly_2022,
             pct_anomaly_2023,
@@ -88,6 +107,8 @@ trauma_registry_counts_2020_2025_final = @chain trauma_registry_counts_2020_2025
             pct_anomaly_2025
         )),
         any_nb_pois_anomaly = any(c(
+            nb_pois_anomaly_2019,
+            nb_pois_anomaly_2020,
             nb_pois_anomaly_2021,
             nb_pois_anomaly_2022,
             nb_pois_anomaly_2023,
@@ -102,7 +123,7 @@ end;
 
 # Before additional data manipulation and modeling, plot differences
 diff_long =
-    @chain trauma_registry_counts_2020_2025_final begin
+    @chain trauma_registry_counts_2018_2025_final begin
         @select(facility_name, contains(r"^(diff|pct)_\d{4}$"))
         @pivot_longer(
             contains(r"^(diff|pct)_\d{4}$"),
@@ -249,7 +270,7 @@ end;
 
 # new long table with counts
 counts_long =
-    @chain trauma_registry_counts_2020_2025_final begin
+    @chain trauma_registry_counts_2018_2025_final begin
         @filter .!occursin.(r"grand total"i, facility_name)
         @select(facility_name, contains(r"^\d{4}$"))
         @pivot_longer(
@@ -331,7 +352,7 @@ for yr in unique(counts_long.year)
 end;
 
 # subset the table with columns we want to see and fit
-anomaly_table = @chain trauma_registry_counts_2020_2025_final begin
+anomaly_table = @chain trauma_registry_counts_2018_2025_final begin
     @filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true | nb_pois_anomaly_2025 == true)
     @select :facility_name, `2024`, `2025`, :diff_2025, :mean_records, :var_records, :sd_records, :pred_interval_lower, :pred_interval_upper, :mean_diff, contains("2025"), :date_data
     @arrange facility_name
@@ -342,7 +363,7 @@ XLSX.writetable("./output/anomaly_table_$(end_year).xlsx", Tables.columntable(an
 
 # export the full table
 XLSX.writetable("./output/iowa_trauma_registry_counts_diffs_$(end_year).xlsx", Tables.columntable(
-    @chain trauma_registry_counts_2020_2025_final begin
+    @chain trauma_registry_counts_2018_2025_final begin
         @select -pred_interval
     end
     ); sheetname="data")

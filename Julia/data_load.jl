@@ -28,8 +28,8 @@ trauma_registry_counts = @chain trauma_registry_counts_file begin
     @mutate facility_id = ifelse(
         ismissing(facility_id), 9999, facility_id
     )
-    @mutate across(`2020`:`2026`, x -> coalesce.(x, 0))
-    @select -(`2020`:`2026`)
+    @mutate across(`2018`:`2026`, x -> coalesce.(x, 0))
+    @select -(`2018`:`2026`)
     @rename_with col -> str_remove_all(col, r"_function$")
     @relocate(starts_with("count_of_incidents"), after = `2026`)
 

@@ -353,8 +353,8 @@ end;
 
 # subset the table with columns we want to see and fit
 anomaly_table = @chain trauma_registry_counts_2018_2025_final begin
-    @filter .!isnan.(pct_2025) & .!ismissing.(pct_2025) & isfinite.(pct_2025) & (pct_anomaly_2025 == true | z_anomaly_2025 == true | nb_pois_anomaly_2025 == true)
-    @select :facility_name, `2024`, `2025`, :diff_2025, :mean_records, :var_records, :sd_records, :pred_interval_lower, :pred_interval_upper, :mean_diff, contains("2025"), :date_data
+    @filter (z_anomaly_2025 == true | nb_pois_anomaly_2025 == true)
+    @select :facility_name, `2024`, `2025`, :pred_interval_lower, :pred_interval_upper, :mean_records, :sd_records, :diff_2024, :diff_2025, :mean_diff, :sd_diff, :pct_2024, :pct_2025, :z_score_diff_2024, :z_score_diff_2025, :z_anomaly_2024, :z_anomaly_2025, :nb_pois_anomaly_2024, :nb_pois_anomaly_2025, :date_data
     @arrange facility_name
 end;
 
